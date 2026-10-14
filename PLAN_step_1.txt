@@ -1,0 +1,19 @@
+I want to make a prototype first: no overworld, just a battle for now.
+also i think maybe original characters later, but for now just make it Corin.
+(I've had ideas for battle with saffron, katashi, keras, and a slime)
+you should start with  slime.
+you have five actions:
+FIGHT
+MAGIC
+ITEM
+MERCY
+let's start with FIGHT:
+"fight timing bar" same as undertale but maybe more deltarune (it's simpler to draw and i don't want to copy assets off the internet)
+MAGIC:
+Corin should start with... 3 magic abilities:
+Haste (makes the SOUL move faster) (lasts 1 FIGHT)
+Accelerated Computation (makes the FIGHT bar slower/easier) (lasts 2 FIGHTS)
+Shockwave (unless they call it something different in the book) (same timing bar but a different attack, maybe more damage but takes MANA) (a sword slash cuts through the air)
+ITEM:
+Transference Sword (makes the Shockwave better)
+Selys-Lyann (Frost debuff: poisons the enemy and slows enemy attacks (a bit) when hit with the sword) (makes FIGHT bar faster/harder) (gives a Frist Armor ability that makes DEF go up)

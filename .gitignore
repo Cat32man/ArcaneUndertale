@@ -1,0 +1,10 @@
+# Godot 4 generated cache (rebuilt automatically when the project opens)
+.godot/
+
+# editor / OS noise
+*.tmp
+.DS_Store
+Thumbs.db
+
+# local tooling
+.claude/
