@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b14u3oa82pyb2"
-path="res://.godot/imported/SlimeBall.png-3acab144cdbd5f4e6bdc46b922df3305.ctex"
+uid="uid://bvvekkxffkli1"
+path="res://.godot/imported/SlimeBall.png-6ffacc0215a18901f0d3179d40e49191.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Slime/SlimeBall.png"
-dest_files=["res://.godot/imported/SlimeBall.png-3acab144cdbd5f4e6bdc46b922df3305.ctex"]
+source_file="res://assets/Slime/SlimeBall.png"
+dest_files=["res://.godot/imported/SlimeBall.png-6ffacc0215a18901f0d3179d40e49191.ctex"]
 
 [params]
 

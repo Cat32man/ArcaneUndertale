@@ -8,3 +8,9 @@ Thumbs.db
 
 # local tooling
 .claude/
+
+# installers and archives - never commit these (GitHub rejects files over 100 MB)
+*.exe
+*.msi
+*.zip
+*.7z

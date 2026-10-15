@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bxc0w041nusfr"
-path="res://.godot/imported/Kerasswordmoveup.png-e2e9e3b3ca55a35fefb28f4515c50604.ctex"
+uid="uid://b6mkfvn3ancgq"
+path="res://.godot/imported/Kerasswordmoveup.png-b8970ec4c1ac4a099f0d8532bbff6164.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Keras/Kerasswordmoveup.png"
-dest_files=["res://.godot/imported/Kerasswordmoveup.png-e2e9e3b3ca55a35fefb28f4515c50604.ctex"]
+source_file="res://assets/Keras/Kerasswordmoveup.png"
+dest_files=["res://.godot/imported/Kerasswordmoveup.png-b8970ec4c1ac4a099f0d8532bbff6164.ctex"]
 
 [params]
 

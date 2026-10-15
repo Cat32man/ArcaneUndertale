@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dxnmyoc8bup1o"
-path="res://.godot/imported/SlimeIdle1.png-5943f455f4bf27242a266370a7737ff4.ctex"
+uid="uid://dhheholhpr88d"
+path="res://.godot/imported/SlimeIdle1.png-bfbb16605f264598173bc2710075828e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Slime/SlimeIdle1.png"
-dest_files=["res://.godot/imported/SlimeIdle1.png-5943f455f4bf27242a266370a7737ff4.ctex"]
+source_file="res://assets/Slime/SlimeIdle1.png"
+dest_files=["res://.godot/imported/SlimeIdle1.png-bfbb16605f264598173bc2710075828e.ctex"]
 
 [params]
 

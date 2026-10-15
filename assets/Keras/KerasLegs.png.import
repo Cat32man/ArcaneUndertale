@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://daiy16hg8he85"
-path="res://.godot/imported/KerasLegs.png-1976feb4dd5364e488fbdd7eccfbaa9a.ctex"
+uid="uid://ban3f36go0iql"
+path="res://.godot/imported/KerasLegs.png-fe988836882a1eca87ceebbcaefa531f.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Keras/KerasLegs.png"
-dest_files=["res://.godot/imported/KerasLegs.png-1976feb4dd5364e488fbdd7eccfbaa9a.ctex"]
+source_file="res://assets/Keras/KerasLegs.png"
+dest_files=["res://.godot/imported/KerasLegs.png-fe988836882a1eca87ceebbcaefa531f.ctex"]
 
 [params]
 

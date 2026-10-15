@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dar62bm3vovd1"
-path="res://.godot/imported/KerasHead.png-10df4eb36ab37ba2c5e718b72d0a4dc0.ctex"
+uid="uid://deiwlffjcu1u1"
+path="res://.godot/imported/KerasHead.png-8aac9fb51d182e8ec91bdc0756991fc9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Keras/KerasHead.png"
-dest_files=["res://.godot/imported/KerasHead.png-10df4eb36ab37ba2c5e718b72d0a4dc0.ctex"]
+source_file="res://assets/Keras/KerasHead.png"
+dest_files=["res://.godot/imported/KerasHead.png-8aac9fb51d182e8ec91bdc0756991fc9.ctex"]
 
 [params]
 

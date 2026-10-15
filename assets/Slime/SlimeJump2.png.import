@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cfc4ayncdma4v"
-path="res://.godot/imported/SlimeJump2.png-70432b2a53c8dbee5e9288c29901be0d.ctex"
+uid="uid://b6ych6kuviy4c"
+path="res://.godot/imported/SlimeJump2.png-12aed9518be215ec57f94573a8ef2158.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Slime/SlimeJump2.png"
-dest_files=["res://.godot/imported/SlimeJump2.png-70432b2a53c8dbee5e9288c29901be0d.ctex"]
+source_file="res://assets/Slime/SlimeJump2.png"
+dest_files=["res://.godot/imported/SlimeJump2.png-12aed9518be215ec57f94573a8ef2158.ctex"]
 
 [params]
 

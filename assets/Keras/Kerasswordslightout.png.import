@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dqykpg1keuhw7"
-path="res://.godot/imported/Kerasswordslightout.png-ade7965cc1766e09d643e841506b95d8.ctex"
+uid="uid://dvypp41a0filv"
+path="res://.godot/imported/Kerasswordslightout.png-5032d0e31ca2bbb145785e18cbf4ec98.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Assets/Keras/Kerasswordslightout.png"
-dest_files=["res://.godot/imported/Kerasswordslightout.png-ade7965cc1766e09d643e841506b95d8.ctex"]
+source_file="res://assets/Keras/Kerasswordslightout.png"
+dest_files=["res://.godot/imported/Kerasswordslightout.png-5032d0e31ca2bbb145785e18cbf4ec98.ctex"]
 
 [params]
 
