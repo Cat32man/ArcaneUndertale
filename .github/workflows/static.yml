@@ -27,7 +27,7 @@ jobs:
       - name: Unzip Game Files
         run: |
           mkdir build
-          unzip -o arcaneundertale (1).zip -d build
+          unzip -o "arcaneundertale (1).zip" -d build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
