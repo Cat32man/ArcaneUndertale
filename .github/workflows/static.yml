@@ -28,6 +28,9 @@ jobs:
         run: |
           mkdir build
           unzip -o "arcaneundertale (1).zip" -d build
+          
+          # Automatically inject the scope fix into index.html to stop the infinite loop
+          sed -i 's|<script src="coi-serviceworker.js"></script>|<script>window.coi = { scope: window.location.pathname };</script><script src="coi-serviceworker.js"></script>|g' build/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
