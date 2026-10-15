@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -39,6 +39,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: './build'
+          overwrite: true
 
       - name: Deploy to GitHub Pages
         id: deployment
