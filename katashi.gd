@@ -152,6 +152,7 @@ func start_turn() -> void:
 	if big:
 		phase = "big"
 		big_phase = "dim_in"
+		b.sfx("dim")
 		big_t = 0.0
 		turns_since_big = 0
 		boss_tx = 320.0
@@ -344,6 +345,7 @@ func _update_slashes(delta: float) -> void:
 			if not s.has("struck"):
 				s["struck"] = true
 				b.add_shake(0.25)
+				b.sfx("flash")
 		if t < tele + SLASH_LIVE + SLASH_FADE:
 			keep.append(s)
 	slashes = keep
@@ -351,6 +353,7 @@ func _update_slashes(delta: float) -> void:
 
 # ------------------------------------------------------------------ Ember Volley
 func _spawn_volley() -> void:
+	b.sfx("fire")
 	var origin := Vector2(boss_x, 132.0)
 	var base: float = ((b.soul as Vector2) - origin).angle()
 	var n: int = randi_range(3, 5)
@@ -411,6 +414,7 @@ func _update_pillars(delta: float) -> void:
 			if not p.has("struck"):
 				p["struck"] = true
 				b.add_shake(0.12)
+				b.sfx("pillar", 0.7)
 		if t < tele + PILLAR_LIVE + 0.2:
 			keep.append(p)
 	pillars = keep
@@ -453,6 +457,7 @@ func _update_prisms(delta: float) -> void:
 			if not pr.has("struck"):
 				pr["struck"] = true
 				b.add_shake(0.2)
+				b.sfx("beam")
 		if t < tele + live + 0.2:
 			keep.append(pr)
 	prisms = keep
@@ -460,6 +465,7 @@ func _update_prisms(delta: float) -> void:
 
 # ------------------------------------------------------------------ Sunstreak
 func _spawn_streak() -> void:
+	b.sfx("dash", 0.7)
 	var ar: Rect2 = arena_rect()
 	var horiz: bool = randf() < 0.6
 	var sp: Vector2 = b.soul
@@ -540,6 +546,7 @@ func _update_spirals(delta: float) -> void:
 			if not r.has("struck"):
 				r["struck"] = true
 				b.add_shake(0.08)
+				b.sfx("beam", 0.35)
 		if t < tele + live + 0.15:
 			keep.append(r)
 	spirals = keep

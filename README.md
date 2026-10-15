@@ -9,7 +9,7 @@ A battle prototype in Godot 4.5: an Undertale/Deltarune-style fight system set i
 2. Open this folder as a project (or run `godot --path .`).
 3. Press F5.
 
-**Controls:** arrows / WASD move, Z / Enter confirm, X / Shift cancel (hold X in a dodge to move slowly).
+**Controls:** arrows / WASD move, Z / Enter confirm, X / Shift cancel (hold X in a dodge to move slowly). M mutes the sound effects.
 
 ## The fights
 
@@ -29,6 +29,7 @@ Corin has FIGHT (timing bar), MAGIC (Haste, Accelerated Computation, Shockwave),
 - `overworld.gd`, `game.gd`, `game.tscn`, `pixel_ui.gd` - a shelved overworld prototype; the project boots into `main.tscn` (the battle).
 - `assets/` - sprites (Slime, Keras, the SOUL heart) and the generated pixel font.
 - `tools/make_pixel_font.py` - generates the pixel font (edit a glyph, re-run).
+- `tools/make_sfx.py` - synthesizes the sound effects in `assets/sfx/` (retune a recipe and re-run, or drop in your own .wav).
 
 ## Developer shortcuts
 

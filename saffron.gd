@@ -116,6 +116,7 @@ func start_turn() -> void:
 	if big:
 		phase = "big"
 		big_phase = "morph_in"
+		b.sfx("dim")
 		big_t = 0.0
 		turns_since_big = 0
 	else:
@@ -152,6 +153,7 @@ func tick(delta: float) -> void:
 
 
 func begin_form2() -> void:
+	b.sfx("powerup")
 	form = 2
 	clone_alpha = 0.0
 	b.add_shake(0.8)
@@ -252,10 +254,12 @@ func _begin_attack(kind: String) -> void:
 			rings.append({"mode": "in", "t": 0.0, "tele": 0.4, "travel": 1.1, "hold": 0.25})
 			pose = "push"
 			pose_t = 1.2
+			b.sfx("swoosh")
 		"outside_push":
 			rings.append({"mode": "out", "t": 0.0, "tele": 0.45, "travel": 0.9, "hold": 0.4})
 			pose = "push"
 			pose_t = 1.2
+			b.sfx("swoosh")
 		"waltz":
 			cur["end"] = _spawn_waltz()
 			pose = "push"
@@ -332,6 +336,7 @@ func _update_bands(delta: float) -> void:
 		if t >= tele and not bd.has("struck"):
 			bd["struck"] = true
 			b.add_shake(0.6)
+			b.sfx("impact")
 		var gt: float = t - tele - STRIKE_T   # time since the strike ended
 		if t >= tele and gt < GHOST_IN + GHOST_HOLD and rect.grow(1.0).has_point(b.soul):
 			b.hurt(D_PUNCH)
@@ -436,6 +441,7 @@ func _update_blades(delta: float) -> void:
 			if not bl.has("struck"):
 				bl["struck"] = true
 				b.add_shake(0.08)
+				b.sfx("stab", 0.6)
 		keep.append(bl)
 	blades = keep
 
@@ -446,6 +452,7 @@ func _spawn_dagger(pos: Vector2, ang: float, seek: bool, wind: float, speed: flo
 
 
 func _spawn_seek_dagger() -> void:
+	b.sfx("throw")
 	var hands: Array = [HAND]
 	if form == 2:
 		hands.append(HAND + Vector2(-CLONE_DX, 0))
@@ -624,6 +631,7 @@ func _update_fists(delta: float) -> void:
 		if depth >= FIST_DEPTH * 0.9 and not f.has("thud"):
 			f["thud"] = true
 			b.add_shake(0.3)
+			b.sfx("thump", 0.8)
 		if depth > 6.0:
 			var d: Vector2 = (b.soul as Vector2) - CENTER
 			var rr: float = d.length()

@@ -116,6 +116,7 @@ func pace() -> float:
 
 func begin_spared() -> void:
 	mode = "spared"
+	b.sfx("spare", 0.8)
 	slashes.clear()
 	edges.clear()
 	parts.clear()
@@ -125,6 +126,8 @@ func begin_spared() -> void:
 
 func begin_allout() -> void:
 	mode = "allout"
+	b.sfx("powerup")
+	b.sfx("draw")
 	turns_since_big = 2   # a Dominion attack can come right away
 	b.add_shake(0.9)
 	sword_pose = "up"   # he draws the blade all the way as he stops holding back
@@ -444,6 +447,7 @@ func _update_slashes(delta: float) -> void:
 			if not s.has("struck"):
 				s["struck"] = true
 				b.add_shake(0.5 if s["kind"] != "sever" else 0.25)
+				b.sfx("cut_big" if s["kind"] == "final" else "cut")
 				pose = "slash"
 				pose_t = 0.3
 				if s["kind"] == "heavy" and float(s["w"]) < 20.0:
@@ -494,6 +498,7 @@ func _update_edges(delta: float) -> void:
 			if not e.has("struck"):
 				e["struck"] = true
 				b.add_shake(0.2)
+				b.sfx("swoosh", 0.8)
 		if not done:
 			keep.append(e)
 	edges = keep
@@ -544,6 +549,7 @@ func _update_parts(delta: float) -> void:
 			if not pt.has("struck"):
 				pt["struck"] = true
 				b.add_shake(0.35)
+				b.sfx("cut", 0.8)
 				pose = "slash"
 				pose_t = 0.3
 			if ((b.soul as Vector2) - (pt["c"] as Vector2)).dot(pt["n"]) > 0.0:
