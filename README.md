@@ -31,10 +31,20 @@ Corin has FIGHT (timing bar), MAGIC (Haste, Accelerated Computation, Shockwave),
 - `tools/make_pixel_font.py` - generates the pixel font (edit a glyph, re-run).
 - `tools/make_sfx.py` - synthesizes the sound effects in `assets/sfx/` (retune a recipe and re-run, or drop in your own .wav).
 
+## Publishing the web build
+
+The site (https://cat32man.github.io/ArcaneUndertale/) is built by `.github/workflows/static.yml` from the zip
+`arcaneundertale (1).zip` in the repo root. To update it:
+
+1. In Godot: *Project > Export... > Web > Export Project...* and save as `build/web/index.html` (untick "Export With Debug").
+2. Double-click `publish_web.bat` (it zips the export, commits only that zip and pushes). Options: see `tools/publish_web.ps1`
+   (`-DryRun` to just check the export, `-NoPush` to commit and push later from GitHub Desktop).
+
 ## Developer shortcuts
 
 Run `godot --path . -- <flags>` to jump straight to a screen:
 `--enemy=keras`, `--sub=item`, `--dodge`, `--big`, `--allout`, `--attack=<move>` (e.g. `--attack=metronome`).
+Keras extras: `--storm` (all-out, next big attack is the Edge Storm), `--gauntlet` (the 1.5 path), `--gx=<x>` (start the path part-way, e.g. `--gx=1000`).
 
 ## Credits
 

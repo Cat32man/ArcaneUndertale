@@ -14,3 +14,12 @@ Thumbs.db
 *.msi
 *.zip
 *.7z
+
+# ...except the zipped Web build that the Pages workflow deploys (tools/publish_web.ps1 updates it)
+!/arcaneundertale (1).zip
+
+# the raw Web export folder - only its zip is committed
+build/
+
+# an earlier Web export that was written straight into the project folder (the preset now uses build/web)
+/Arcane Undertale.*
