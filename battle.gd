@@ -102,6 +102,9 @@ var armor_cut: int = 0          # turns Frost Armor stays cut (Keras)
 var menu_cut: int = -1          # menu button index cut away for a turn (Keras)
 var sever_note: bool = false
 var items_cut: bool = false     # Keras phase 2: the healing half of the ITEM button is gone
+var blade_dull: int = 0         # turns the sword stays dulled (FIGHT damage halved)
+var dull_note: bool = false
+var mana_note: int = 0
 var menu_note: bool = false
 var bar_mult: float = 1.0   # >1 = this enemy makes the FIGHT bar faster (Katashi is fast)
 var saf = null
@@ -193,6 +196,16 @@ func _ready() -> void:
 			if arg == "--allout" and enemy_id == "keras":
 				saf.begin_allout()
 				items_cut = true
+			if arg == "--storm" and enemy_id == "keras":   # all-out Keras, next big attack = Edge Storm
+				saf.begin_allout()
+				saf.turns_since_big = 99
+				saf.big_runs = 1
+				items_cut = true
+			if arg.begins_with("--gx=") and saf != null and enemy_id == "keras":
+				saf.dev_gx = float(arg.substr(5))
+			if arg == "--gauntlet" and enemy_id == "keras":   # skip ahead: Keras has spared you, you swing
+				saf.begin_spared()
+				saf.begin_gauntlet()
 			if arg == "--dodge":
 				start_dodge()
 				for a2 in OS.get_cmdline_user_args():
@@ -253,6 +266,9 @@ func setup_enemy(id: String) -> void:
 	armor_cut = 0
 	menu_cut = -1
 	items_cut = false
+	blade_dull = 0
+	dull_note = false
+	mana_note = 0
 	sever_note = false
 	menu_note = false
 	hp = max_hp
@@ -344,6 +360,24 @@ func sever() -> void:
 	sever_note = true
 	add_popup("SEVERED", soul + Vector2(0, -30), Color(0.9, 0.6, 1.0))
 	sfx("sever")
+
+
+func dull_blade() -> void:
+	# Edge Breaker: the cut takes the edge off whatever sword Corin holds
+	blade_dull = 3
+	dull_note = true
+	add_popup("DULLED", soul + Vector2(0, -30), Color(1.0, 0.8, 0.4))
+	sfx("sever")
+
+
+func drain_mp(amount: int) -> int:
+	# Mana Breaker: burns some of Corin's mana (the keras engine then detonates it at the spot)
+	var lost: int = mini(amount, mp)
+	mp -= lost
+	mana_note += lost
+	add_popup("-%d MP" % lost, soul + Vector2(0, -30), Color(0.5, 0.7, 1.0))
+	sfx("sever", 0.8)
+	return lost
 
 
 func cut_menu() -> void:
@@ -554,6 +588,8 @@ func to_menu() -> void:
 	state = S.MENU
 	if enemy_id == "keras" and saf.mode == "spared":
 		menu_text = "* Keras has spared you. He waits, the blade lowered. If you keep fighting, he will not hold back."
+		if saf.gauntlet_passed:
+			menu_text = "* Keras waits, the blade lowered. Take your time to heal. When Corin attacks, he will not hold back."
 	elif enemy_id == "keras":
 		var rlines: Array = ["* Keras shifts his grip. The air parts around the blade.", "* The Dominion Breaker is very quiet.", "* Keras is holding back, and he knows you can tell."]
 		menu_text = "* Keras is flagging. Mercy is possible." if spareable() else rlines.pick_random()
@@ -638,6 +674,8 @@ func _begin_slash() -> void:
 
 func _apply_hit() -> void:
 	var base: float = float(atk) * 2.2
+	if blade_dull > 0:
+		base *= 0.5   # the Dominion Breaker cut the edge off the blade
 	if slash_kind == "shock":
 		base *= 2.5 if weapon == "transference" else 1.8
 	var dmg: int = int(round(base * slash_mult))
@@ -647,9 +685,13 @@ func _apply_hit() -> void:
 	accel_left = maxi(0, accel_left - 1)
 	var lead: Array = []
 	if enemy_id == "keras" and saf.mode == "spared":
-		saf.begin_allout()   # you swung at someone who spared you
-		items_cut = true
-		lead = ["* Keras's eyes narrow.", "* \"...Then I will not hold back.\"", "* The Dominion Breaker screams through the air.", "* It cut Corin's ITEM button in half! The healing items are gone!"]
+		if saf.gauntlet_passed:
+			saf.begin_allout()   # you swung at him after the path: now he stops holding back
+			items_cut = true
+			lead = ["* Keras's eyes narrow.", "* \"...Then I will not hold back.\"", "* The Dominion Breaker screams through the air.", "* It cut Corin's ITEM button in half! The healing items are gone!"]
+		else:
+			saf.begin_gauntlet()   # you swung at someone who spared you: first, the path
+			lead = ["* Keras's eyes narrow.", "* \"...Then run.\"", "* The Dominion Breaker carves the arena into a path!"]
 	if dmg <= 0:
 		add_popup("MISS", SLIME_POS + Vector2(0, -70), Color.GRAY)
 		enemy_turn(lead)
@@ -702,6 +744,8 @@ func enemy_turn(prefix: Array = []) -> void:
 			lines = ["* Saffron is breathing hard.", "* \"...Not yet.\""]
 	if enemy_id == "keras":
 		lines = ["* Keras raises the Dominion Breaker.", "* \"Watch closely.\"", "* The blade hums.", "* \"I am giving you time. Use it.\""]
+		if saf.mode == "gauntlet":
+			lines = ["* The path stretches ahead. Behind Corin, the blades are already moving.", "* \"Keep moving.\""]
 		if saf.mode == "allout":
 			lines = ["* Keras is a blur.", "* \"This is the speed I always had.\"", "* The cuts come faster than the warnings.", "* \"Keep up.\""]
 		if spareable():
@@ -773,12 +817,23 @@ func end_dodge() -> void:
 		notes += _form_lines()
 	if armor_cut > 0:
 		armor_cut -= 1
+	if blade_dull > 0:
+		blade_dull -= 1
+	if dull_note:
+		dull_note = false
+		notes.append("* The Dominion Breaker dulled the blade! FIGHT damage is halved for 2 turns.")
+	if mana_note > 0:
+		notes.append("* The Dominion Breaker burst the mana in Corin! (-%d MP)" % mana_note)
+		mana_note = 0
 	if sever_note:
 		sever_note = false
 		notes.append("* The Dominion Breaker severed Corin's buffs and Frost Armor!")
 	if menu_note:
 		menu_note = false
 		notes.append("* It cut through the %s option, too." % BUTTONS[menu_cut].capitalize())
+	if enemy_id == "keras" and saf.mode == "gauntlet" and saf.gauntlet_done:
+		saf.end_gauntlet()
+		notes += ["* Corin outran the blades.", "* Keras lowers the Dominion Breaker. \"...Good. Catch your breath.\"", "* He is waiting. This is the time to heal."]
 	if notes.is_empty():
 		to_menu()
 	else:
@@ -1177,13 +1232,13 @@ func _draw_select() -> void:
 	_text("ARCANE UNDERTALE", Vector2(0, 110), 36, Color.WHITE, 640.0, HORIZONTAL_ALIGNMENT_CENTER)
 	_text("battle prototype", Vector2(0, 138), 16, Color.GRAY, 640.0, HORIZONTAL_ALIGNMENT_CENTER)
 	for i in ENEMIES.size():
-		var y: float = 230.0 + 44.0 * i
+		var y: float = 215.0 + 40.0 * i
 		var col: Color = Color.YELLOW if i == select_idx else Color.WHITE
 		_text(String(ENEMIES[i]["label"]), Vector2(240, y), 22, col)
 		if i == select_idx:
 			_heart(Vector2(218, y - 8), 9.0, Color.RED)
-	_text(String(ENEMIES[select_idx]["desc"]), Vector2(0, 380), 16, Color(0.7, 0.7, 0.7), 640.0, HORIZONTAL_ALIGNMENT_CENTER)
-	_text("Up/Down: choose     Z: start", Vector2(0, 430), 14, Color.GRAY, 640.0, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(String(ENEMIES[select_idx]["desc"]), Vector2(0, 392), 13, Color(0.7, 0.7, 0.7), 640.0, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("Up/Down: choose     Z: start     M: mute", Vector2(0, 440), 14, Color.GRAY, 640.0, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _draw_slash() -> void:
@@ -1295,6 +1350,8 @@ func _draw_hud() -> void:
 		st.append("ACCEL x%d" % accel_left)
 	if weapon == "selys":
 		st.append("FROST ARMOR CUT (%d)" % armor_cut if armor_cut > 0 else "FROST ARMOR (DEF+%d)" % defense())
+	if blade_dull > 0:
+		st.append("BLADE DULL x%d" % blade_dull)
 	_text("  ".join(st), Vector2(40, 384), 12, Color(0.6, 0.9, 1.0))
 	var wname: String = {"plain": "Sword", "transference": "Transference Sword", "selys": "Selys-Lyann"}[weapon]
 	_text(wname, Vector2(400, 384), 12, Color(0.8, 0.8, 0.8), 200.0, HORIZONTAL_ALIGNMENT_RIGHT)

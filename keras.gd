@@ -12,6 +12,9 @@ extends RefCounted
 ##   sever      Sever Slash   thin violet cut: if it touches you it severs your buffs + Frost Armor
 ##   metronome  Metronome     cuts swing from a pivot in a fixed sweep, then the return sweep lands in the gaps
 ##                            you were hiding in - identical every time, so it can be learned
+## Phase 1.5 (mode "gauntlet"): if you attack a Keras who has spared you, he carves the arena into a PATH of rooms
+## and you run it while a wall of blades creeps in from behind. It is the LAST TEST of phase 1: afterwards he
+## waits again (heal as much as you like) and only your next attack makes him go all-out.
 ## Phase 2 (mode): at 40% HP he SPARES you and waits. If you keep fighting he goes ALL-OUT -
 ## the speed he always had: warnings about half as long, longer chains, bigger/more frequent
 ## Dominion attacks, and a new move: Flurry (rapid thin cuts).
@@ -31,6 +34,8 @@ const D_PART := 22
 const D_SEVER := 18
 const D_FINAL := 50
 const D_CRACK := 8
+const D_AURA := 20
+const D_BLAST := 24
 
 const SLASH_LIVE := 0.2
 const SLASH_FADE := 0.3
@@ -89,6 +94,10 @@ var slashes: Array = []
 var edges: Array = []
 var parts: Array = []
 var cracks: Array = []
+var crumbles: Array = []
+var blasts: Array = []
+var big_kind: String = "dominion"   # dominion | storm (all-out only)
+var big_runs: int = 0
 
 
 func _init(battle) -> void:
@@ -103,11 +112,14 @@ func arena_rect() -> Rect2:
 
 
 func box_rect() -> Rect2:
+	if phase == "gauntlet":
+		return G_VIEW
 	return arena_rect()
 
 
 func draw_arena() -> void:
-	pass   # the arena is never reshaped (partition only darkens a half of it)
+	if phase == "gauntlet":
+		_g_draw_world()   # otherwise the arena keeps its shape (partition only darkens a half of it)
 
 
 func pace() -> float:
@@ -121,6 +133,8 @@ func begin_spared() -> void:
 	edges.clear()
 	parts.clear()
 	cracks.clear()
+	crumbles.clear()
+	blasts.clear()
 	pose = "idle"
 
 
@@ -187,6 +201,8 @@ func start_turn() -> void:
 	edges.clear()
 	parts.clear()
 	cracks.clear()
+	crumbles.clear()
+	blasts.clear()
 	queue.clear()
 	cur = {}
 	gap = 0.5 * pace()
@@ -196,6 +212,9 @@ func start_turn() -> void:
 	pose = "idle"
 	b.soul = CENTER
 	boss_tx = 320.0
+	if mode == "gauntlet":
+		_start_gauntlet()
+		return
 	var big: bool = turns_since_big >= 2 and (turns_since_big >= 4 or randf() < 0.4)
 	if mode == "allout":
 		big = turns_since_big >= 1 and (turns_since_big >= 3 or randf() < 0.5)
@@ -206,6 +225,11 @@ func start_turn() -> void:
 		big_cuts = 0
 		big_sever_done = false
 		turns_since_big = 0
+		big_kind = "dominion"
+		if mode == "allout":
+			big_runs += 1
+			if big_runs % 2 == 0:
+				big_kind = "storm"   # every other all-out big attack is the Edge Storm
 	else:
 		phase = "chain"
 		turns_since_big += 1
@@ -214,7 +238,7 @@ func start_turn() -> void:
 
 
 func _pick_kind() -> String:
-	var kinds: Array = ["heavy", "cross", "judgment", "edge", "partition", "sever", "metronome"]
+	var kinds: Array = ["heavy", "cross", "judgment", "edge", "edge", "partition", "sever", "metronome", "aura", "edgebreak", "manabreak"]
 	if mode == "allout":
 		kinds.append("flurry")
 		kinds.append("flurry")
@@ -226,12 +250,14 @@ func _pick_kind() -> String:
 
 
 func _all_clear() -> bool:
-	return slashes.is_empty() and edges.is_empty() and parts.is_empty() and cracks.is_empty()
+	return slashes.is_empty() and edges.is_empty() and parts.is_empty() and cracks.is_empty() and crumbles.is_empty() and blasts.is_empty()
 
 
 func update(delta: float) -> bool:
 	turn_t += delta
 	pose_t = maxf(0.0, pose_t - delta)
+	if phase == "gauntlet":
+		return _update_gauntlet(delta)
 	_move_soul(delta)
 	if phase == "chain":
 		_update_chain(delta)
@@ -241,11 +267,15 @@ func update(delta: float) -> bool:
 	_update_edges(delta)
 	_update_parts(delta)
 	_update_cracks(delta)
+	_update_crumbles(delta)
+	_update_blasts(delta)
 	if turn_t > 28.0:
 		slashes.clear()
 		edges.clear()
 		parts.clear()
 		cracks.clear()
+		crumbles.clear()
+		blasts.clear()
 		finished = true
 	return finished
 
@@ -318,9 +348,27 @@ func _run_attack(delta: float) -> void:
 				_end_attack()
 		"edge":
 			if step == 0:
-				_spawn_edge()
+				cur["end"] = _spawn_edge_run(randi_range(3, 4))
 				cur["step"] = 1
-			if t >= 2.2 * pc:
+			if step >= 1 and t >= float(cur["end"]):
+				_end_attack()
+		"aura":
+			if step == 0:
+				cur["end"] = _spawn_aura()
+				cur["step"] = 1
+			if step >= 1 and t >= float(cur["end"]):
+				_end_attack()
+		"edgebreak":
+			if step == 0:
+				_spawn_edgebreak()
+				cur["step"] = 1
+			if t >= 1.3 * pc:
+				_end_attack()
+		"manabreak":
+			if step == 0:
+				_spawn_manabreak()
+				cur["step"] = 1
+			if t >= 1.3 * pc:
 				_end_attack()
 		"partition":
 			if step == 0:
@@ -444,6 +492,11 @@ func _update_slashes(delta: float) -> void:
 						b.sever()
 					elif s["kind"] == "final":
 						b.cut_menu()
+					elif s["kind"] == "dull":
+						b.dull_blade()
+					elif s["kind"] == "mana":
+						var lost: int = b.drain_mp(10)
+						blasts.append({"pos": b.soul, "t": 0.0, "tele": 1.15, "r": 50.0})   # >1s: outlasts the hit's invulnerability
 			if not s.has("struck"):
 				s["struck"] = true
 				b.add_shake(0.5 if s["kind"] != "sever" else 0.25)
@@ -471,12 +524,50 @@ func _update_cracks(delta: float) -> void:
 
 
 # ------------------------------------------------------------------ Falling Edge
-func _spawn_edge() -> void:
+# Falling Edge: a blade sweeps the whole arena with one gap. Now a RUN of 3-4 of them, one behind
+# the other (same direction, ~100 px apart), each gap in a different place - slip across to the next.
+func _next_gap(prev: float, gw: float) -> float:
+	var ar: Rect2 = arena_rect()
+	var lo: float = ar.position.x + gw * 0.5 + 6.0
+	var hi: float = ar.end.x - gw * 0.5 - 6.0
+	var x: float = prev + randf_range(60.0, 105.0) * (1.0 if randf() < 0.5 else -1.0)
+	if x < lo or x > hi:
+		x = prev - (x - prev)   # bounce to the other side so it never stalls at a wall
+	return clampf(x, lo, hi)
+
+
+func _spawn_edge_run(n: int) -> float:
 	var ar: Rect2 = arena_rect()
 	var gw: float = 64.0
-	var gx: float = clampf(float(b.soul.x) + randf_range(-45.0, 45.0), ar.position.x + gw * 0.5 + 6.0, ar.end.x - gw * 0.5 - 6.0)
+	var speed: float = 100.0 / pace()
+	var tele: float = 0.85 * pace()
+	var spacing: float = 100.0
 	var down: bool = randf() < 0.5
-	edges.append({"gx": gx, "gw": gw, "down": down, "t": 0.0, "tele": 0.85 * pace(), "speed": 100.0 / pace(), "y": ar.position.y if down else ar.end.y, "hit": false})
+	var gx: float = clampf(float(b.soul.x) + randf_range(-45.0, 45.0), ar.position.x + gw * 0.5 + 6.0, ar.end.x - gw * 0.5 - 6.0)
+	for k in n:
+		if k > 0:
+			gx = _next_gap(gx, gw)
+		edges.append({"gx": gx, "gw": gw, "down": down, "t": -float(k) * spacing / speed, "tele": tele, "speed": speed,
+			"y": ar.position.y if down else ar.end.y})
+	return float(n - 1) * spacing / speed + tele + 130.0 / speed
+
+
+# Edge Storm (all-out only, a big attack): 11 blades alternating down / up, on a FIXED snake of gap
+# positions (the same every time), one every 0.6 s - so there are always two in the arena at once.
+# Neighbouring blades travel in opposite directions and cross each other, so their gaps must be close
+# enough (<= 0.25 of the width) to share a safe spot where they cross; same-direction blades can differ more.
+const STORM_GAPS := [0.5, 0.25, 0.5, 0.75, 0.5, 0.25, 0.5, 0.8, 0.55, 0.3, 0.5]
+
+
+func _spawn_edge_storm() -> void:
+	var ar: Rect2 = arena_rect()
+	var gw: float = 56.0
+	var lo: float = ar.position.x + gw * 0.5 + 6.0
+	var hi: float = ar.end.x - gw * 0.5 - 6.0
+	for k in STORM_GAPS.size():
+		var down: bool = k % 2 == 0
+		edges.append({"gx": lerpf(lo, hi, float(STORM_GAPS[k])), "gw": gw, "down": down, "t": -float(k) * 0.6, "tele": 0.5,
+			"speed": 130.0, "y": ar.position.y if down else ar.end.y})
 
 
 func _update_edges(delta: float) -> void:
@@ -502,6 +593,126 @@ func _update_edges(delta: float) -> void:
 		if not done:
 			keep.append(e)
 	edges = keep
+
+
+# ------------------------------------------------------------------ Disintegrating Aura
+# His annihilation aura eats the arena from one side: three strips crumble on three beats (the RIGHT
+# side first, pushing you left), then that side heals and the LEFT crumbles the same way (pushing you
+# right). Each wave swallows the middle, so you have to cross over on the beat.
+func _spawn_aura() -> float:
+	var ar: Rect2 = arena_rect()
+	var beat: float = 0.55 * pace()
+	var tele: float = 0.5 * pace()
+	var w: float = 38.0
+	var t0: float = 0.0
+	var last_end: float = 0.0
+	for side: String in ["R", "L"]:
+		var end: float = t0 + 2.0 * beat + tele + 0.9   # this wave ends together
+		for k in 3:
+			var start: float = t0 + float(k) * beat
+			var rect: Rect2
+			if side == "R":
+				rect = Rect2(ar.end.x - float(k + 1) * w, ar.position.y, w, ar.size.y)
+			else:
+				rect = Rect2(ar.position.x + float(k) * w, ar.position.y, w, ar.size.y)
+			crumbles.append({"rect": rect, "t": -start, "tele": tele, "life": end - (start + tele)})
+		last_end = end
+		t0 = end - 0.25   # the next wave starts as this one heals
+	return last_end - 0.2
+
+
+func _update_crumbles(delta: float) -> void:
+	var keep: Array = []
+	for c: Dictionary in crumbles:
+		c["t"] += delta
+		var t: float = c["t"]
+		var tele: float = c["tele"]
+		var life: float = c["life"]
+		var rect: Rect2 = c["rect"]
+		if t >= tele and t < tele + life:
+			if not c.has("struck"):
+				c["struck"] = true
+				b.add_shake(0.12)
+				b.sfx("cut", 0.5)
+			if rect.grow(2.0).has_point(b.soul):
+				b.hurt(D_AURA)
+		if t < tele + life + 0.25:
+			keep.append(c)
+	crumbles = keep
+
+
+func _draw_crumble(c: Dictionary) -> void:
+	var t: float = c["t"]
+	if t < 0.0:
+		return
+	var tele: float = c["tele"]
+	var life: float = c["life"]
+	var rect: Rect2 = c["rect"]
+	if t < tele:
+		var blink: float = 0.5 + 0.5 * sin(t * 20.0)
+		b.draw_rect(rect, Color(0.8, 0.4, 1.0, 0.06 + 0.14 * blink))
+		b.draw_rect(rect.grow(-1.0), Color(0.9, 0.6, 1.0, 0.4 + 0.5 * blink), false, 2.0)
+	elif t < tele + life:
+		var pulse: float = 0.5 + 0.5 * sin(t * 10.0)
+		b.draw_rect(rect, Color(0.12, 0.0, 0.22, 0.95))
+		b.draw_rect(rect, Color(0.8, 0.3, 1.0, 0.10 + 0.10 * pulse))
+		b.draw_rect(rect, Color(0.9, 0.7, 1.0, 0.8), false, 2.0)
+	else:
+		var f: float = 1.0 - (t - tele - life) / 0.25
+		b.draw_rect(rect, Color(0.12, 0.0, 0.22, 0.7 * f))
+
+
+# ------------------------------------------------------------------ Edge Breaker / Mana Breaker
+# Two more thin cuts, like the Sever Slash (Spell Breaker / Essence Breaker):
+#   Edge Breaker (amber): if it touches you, it dulls your sword - FIGHT damage is halved for 2 turns.
+#   Mana Breaker (blue):  if it touches you, it burns 10 MP and the mana bursts out at that spot a moment later.
+func _spawn_edgebreak() -> void:
+	var sp: Vector2 = b.soul + Vector2(randf_range(-15.0, 15.0), randf_range(-12.0, 12.0))
+	var vertical: bool = randf() < 0.5
+	_add_slash(sp, Vector2(0, 1) if vertical else Vector2(1, 0), 10.0, 1.0 * pace(), 18, "dull")
+
+
+func _spawn_manabreak() -> void:
+	var sp: Vector2 = b.soul + Vector2(randf_range(-15.0, 15.0), randf_range(-12.0, 12.0))
+	var vertical: bool = randf() < 0.5
+	_add_slash(sp, Vector2(0, 1) if vertical else Vector2(1, 0), 10.0, 1.0 * pace(), 14, "mana")
+
+
+func _update_blasts(delta: float) -> void:
+	var keep: Array = []
+	for bl: Dictionary in blasts:
+		bl["t"] += delta
+		var t: float = bl["t"]
+		var tele: float = bl["tele"]
+		var r: float = bl["r"]
+		if t >= tele and t < tele + 0.22:
+			if not bl.has("struck"):
+				bl["struck"] = true
+				b.add_shake(0.35)
+				b.sfx("impact", 0.8)
+			if ((b.soul as Vector2) - (bl["pos"] as Vector2)).length() < r:
+				b.hurt(D_BLAST)
+		if t < tele + 0.5:
+			keep.append(bl)
+	blasts = keep
+
+
+func _draw_blast(bl: Dictionary) -> void:
+	var t: float = bl["t"]
+	var tele: float = bl["tele"]
+	var r: float = bl["r"]
+	var pos: Vector2 = bl["pos"]
+	if t < tele:
+		var p: float = t / tele
+		b.draw_circle(pos, r, Color(0.3, 0.5, 1.0, 0.05 + 0.15 * p))
+		b.draw_arc(pos, r * (1.8 - 0.8 * p), 0.0, TAU, 32, Color(0.5, 0.7, 1.0, 0.4 + 0.5 * p), 2.0)
+		b.draw_arc(pos, r, 0.0, TAU, 32, Color(0.7, 0.85, 1.0, 0.5 + 0.4 * sin(t * 24.0) * 0.5), 2.0)
+	elif t < tele + 0.22:
+		b.draw_circle(pos, r, Color(0.6, 0.8, 1.0, 0.85))
+		b.draw_circle(pos, r * 0.6, Color(1, 1, 1, 0.95))
+	else:
+		var f: float = 1.0 - (t - tele - 0.22) / 0.28
+		b.draw_circle(pos, r * (1.0 + 0.3 * (1.0 - f)), Color(0.6, 0.8, 1.0, 0.5 * f))
 
 
 # ------------------------------------------------------------------ Partition
@@ -569,9 +780,14 @@ func _update_big(delta: float) -> void:
 			pass
 			b.rumble(0.3)
 			if big_t >= 1.0 * pace():
-				big_phase = "play"
 				big_t = 0.0
-				big_spawn = 0.1
+				if big_kind == "storm":
+					big_phase = "storm"
+					_spawn_edge_storm()
+					b.add_shake(0.5)
+				else:
+					big_phase = "play"
+					big_spawn = 0.1
 		"play":
 			pose = "raise" if pose_t <= 0.0 else pose
 			big_spawn -= delta
@@ -585,6 +801,13 @@ func _update_big(delta: float) -> void:
 				pass
 				pose = "raise"
 				pose_t = 1.8
+		"storm":
+			b.rumble(0.2)
+			pose = "slash" if int(big_t / 0.3) % 2 == 0 else "raise"
+			pose_t = 0.2
+			if big_t > 0.5 and edges.is_empty():
+				big_phase = "recover"
+				big_t = 0.0
 		"final":
 			b.rumble(0.3)
 			if big_t >= 1.5 * (0.7 if mode == "allout" else 1.0) + SLASH_LIVE + SLASH_FADE + 0.2:
@@ -609,12 +832,327 @@ func _spawn_big_cut() -> void:
 	pose_t = 0.25
 
 
+# ------------------------------------------------------------------ Gauntlet ("phase 1.5")
+# Between holding back and all-out: Keras carves the arena into a PATH of rooms of different sizes and
+# you run it left to right while the view scrolls. Each room has its own hazard:
+#   fire hall  - fireballs drop from the ceiling in a staggered rhythm
+#   blade hall - three blade GATES; each has a gap that slides up and down (blade "parkour")
+#   grand hall - a blade WALL sweeps side to side with a moving gap, under a wave of fireballs from both walls
+#   last room  - one fast gate
+# And behind you a wall of blades creeps forward, slowly, so you can't stand still. Reach the exit to finish.
+# Everything is deterministic (no randomness), so the course can be learned.
+const G_VIEW := Rect2(60, 190, 520, 150)   # the box while the path is on screen
+const G_LEN := 1480.0                      # world length
+const G_EXIT := 1440.0                     # reach this x to finish
+const G_WALL_START := -90.0
+const G_WALL_SPEED := 60.0
+const D_GFIRE := 16
+const D_GBLADE := 26
+const D_GWALL := 24
+# open space (world coordinates): rooms and the short doors between them
+const G_OPEN := [
+	Rect2(0, 190, 240, 150),      # start room (big)
+	Rect2(240, 245, 40, 40),      # door
+	Rect2(280, 205, 260, 120),    # fire hall
+	Rect2(540, 245, 40, 40),      # door
+	Rect2(580, 215, 300, 100),    # blade hall (narrow)
+	Rect2(880, 240, 40, 50),      # door
+	Rect2(920, 190, 320, 150),    # grand hall (big)
+	Rect2(1240, 245, 40, 40),     # door
+	Rect2(1280, 220, 200, 90),    # last room
+]
+# blade gates: a vertical blade line from ceiling to floor with a 44px gap whose centre slides up and down
+const G_GATES := [
+	{"x": 660.0, "top": 215.0, "bot": 315.0, "period": 1.9, "phase": 0.0},
+	{"x": 740.0, "top": 215.0, "bot": 315.0, "period": 1.9, "phase": 3.14},
+	{"x": 820.0, "top": 215.0, "bot": 315.0, "period": 1.9, "phase": 1.6},
+	{"x": 1350.0, "top": 220.0, "bot": 310.0, "period": 2.4, "phase": 0.0, "gap": 50.0},   # the last gate: slower, wider
+]
+# fireball vents: they fire a ball every `period` seconds, offset by `phase`
+const G_EMIT := [
+	{"x": 345.0, "y": 207.0, "vx": 0.0, "vy": 1.0, "period": 1.7, "phase": 0.0},
+	{"x": 405.0, "y": 207.0, "vx": 0.0, "vy": 1.0, "period": 1.7, "phase": 0.57},
+	{"x": 465.0, "y": 207.0, "vx": 0.0, "vy": 1.0, "period": 1.7, "phase": 1.13},
+	{"x": 970.0, "y": 192.0, "vx": 0.0, "vy": 1.0, "period": 2.6, "phase": 0.0},
+	{"x": 1040.0, "y": 192.0, "vx": 0.0, "vy": 1.0, "period": 2.6, "phase": 0.65},
+	{"x": 1110.0, "y": 192.0, "vx": 0.0, "vy": 1.0, "period": 2.6, "phase": 1.3},
+	{"x": 1180.0, "y": 192.0, "vx": 0.0, "vy": 1.0, "period": 2.6, "phase": 1.95},
+	{"x": 1075.0, "y": 338.0, "vx": 0.0, "vy": -1.0, "period": 2.6, "phase": 0.3},
+	{"x": 1215.0, "y": 338.0, "vx": 0.0, "vy": -1.0, "period": 2.6, "phase": 1.6},
+]
+const G_BALL_SPEED := 180.0
+const G_GAP := 36.0   # gap height in a blade gate
+
+var gauntlet_done: bool = false
+var gauntlet_passed: bool = false   # the path was cleared: Keras waits again, and the NEXT attack means all-out
+var dev_gx: float = -1.0   # dev flag --gx=<x>: start the course part-way along (to look at a room)
+var g_t: float = 0.0
+var g_end_t: float = 0.0
+var wsoul: Vector2 = Vector2(60, 265)   # the SOUL in world coordinates (b.soul gets the screen position)
+var g_cam: float = 0.0
+var g_balls: Array = []
+var g_next: Array = []
+
+
+func begin_gauntlet() -> void:
+	mode = "gauntlet"
+	b.sfx("powerup")
+	b.add_shake(0.7)
+
+
+func end_gauntlet() -> void:
+	# The path was the last test of phase 1. He lowers the blade again and waits - no attacks, so there is
+	# time to heal - and only when Corin attacks again does he stop holding back.
+	gauntlet_passed = true
+	mode = "spared"
+	pose = "idle"
+	b.sfx("spare", 0.6)
+
+
+func _start_gauntlet() -> void:
+	phase = "gauntlet"
+	gauntlet_done = false
+	finished = false
+	g_t = 0.0
+	g_end_t = 0.0
+	wsoul = Vector2(60, 265)
+	if dev_gx > 0.0:
+		wsoul.x = dev_gx
+		g_t = maxf(0.0, (dev_gx - 60.0) / 120.0)
+	g_balls.clear()
+	g_next.clear()
+	for e: Dictionary in G_EMIT:
+		var first: float = float(e["phase"])
+		if g_t > first:   # dev jump-ahead: skip the backlog of shots
+			first += ceilf((g_t - first) / float(e["period"])) * float(e["period"])
+		g_next.append(first)
+	morph = 1.0
+	_g_sync()
+	b.sfx("dim")
+
+
+func _g_screen(wp: Vector2) -> Vector2:
+	return Vector2(G_VIEW.position.x + wp.x - g_cam, wp.y)
+
+
+func _g_sync() -> void:
+	g_cam = clampf(wsoul.x - 190.0, 0.0, G_LEN - G_VIEW.size.x)
+	b.soul = _g_screen(wsoul)
+
+
+func _g_open(pt: Vector2) -> bool:
+	for r: Rect2 in G_OPEN:
+		if r.has_point(pt):
+			return true
+	return false
+
+
+func _g_free(p: Vector2) -> bool:
+	for c in [Vector2(-5, -5), Vector2(5, -5), Vector2(-5, 5), Vector2(5, 5)]:
+		if not _g_open(p + c):
+			return false
+	return true
+
+
+func _g_wall_x(tt: float) -> float:
+	return G_WALL_START + G_WALL_SPEED * tt
+
+
+# the blade rectangles (world coords) that exist at time tt
+func _g_blades(tt: float) -> Array:
+	var out: Array = []
+	for g: Dictionary in G_GATES:
+		var top: float = g["top"]
+		var bot: float = g["bot"]
+		var gap: float = float(g.get("gap", G_GAP))
+		var amp: float = (bot - top - gap) * 0.5 - 4.0
+		var yc: float = (top + bot) * 0.5 + amp * sin(TAU * tt / float(g["period"]) + float(g["phase"]))
+		var x: float = g["x"]
+		out.append(Rect2(x - 7.0, top, 14.0, (yc - gap * 0.5) - top))
+		out.append(Rect2(x - 7.0, yc + gap * 0.5, 14.0, bot - (yc + gap * 0.5)))
+	# the grand hall's sweeping blade wall, with a moving gap
+	var sx: float = 1080.0 + 140.0 * sin(TAU * tt / 4.8)
+	var sy: float = 265.0 + 40.0 * sin(TAU * tt / 3.4)
+	out.append(Rect2(sx - 7.0, 190.0, 14.0, (sy - 27.0) - 190.0))
+	out.append(Rect2(sx - 7.0, sy + 27.0, 14.0, 340.0 - (sy + 27.0)))
+	# a second one sweeping the other way
+	var sx2: float = 1080.0 - 140.0 * sin(TAU * tt / 4.8 + 1.2)
+	var sy2: float = 265.0 - 40.0 * sin(TAU * tt / 3.4 + 0.8)
+	out.append(Rect2(sx2 - 7.0, 190.0, 14.0, (sy2 - 27.0) - 190.0))
+	out.append(Rect2(sx2 - 7.0, sy2 + 27.0, 14.0, 340.0 - (sy2 + 27.0)))
+	return out
+
+
+# fireball positions at time g_t + tt, counting balls that have not been fired yet
+func _g_balls_at(tt: float) -> Array:
+	var out: Array = []
+	for ball: Dictionary in g_balls:
+		out.append((ball["pos"] as Vector2) + (ball["vel"] as Vector2) * tt)
+	for i in G_EMIT.size():
+		var e: Dictionary = G_EMIT[i]
+		var n: float = g_next[i]
+		while n <= g_t + tt:
+			var age: float = (g_t + tt) - n
+			if age < 1.0:
+				out.append(Vector2(float(e["x"]), float(e["y"])) + Vector2(float(e["vx"]), float(e["vy"])) * G_BALL_SPEED * age)
+			n += float(e["period"])
+	return out
+
+
+# would a SOUL standing at world point p, `tt` seconds from now, be hit by anything? (also used by tests)
+func g_hit_at(p: Vector2, tt: float) -> bool:
+	var soul_rect := Rect2(p - Vector2(5, 5), Vector2(10, 10))
+	for r: Rect2 in _g_blades(g_t + tt):
+		if r.size.y > 0.0 and r.intersects(soul_rect):
+			return true
+	for bp: Vector2 in _g_balls_at(tt):
+		if bp.distance_to(p) < 10.0:
+			return true
+	return p.x - 5.0 < _g_wall_x(g_t + tt)
+
+
+func _update_gauntlet(delta: float) -> bool:
+	g_t += delta
+	pose = "raise"
+	pose_t = 0.3
+	if not gauntlet_done:
+		# movement: same controls as everywhere, but through the rooms
+		var spd: float = b.SOUL_SPEED_HASTE if b.haste_left > 0 else b.SOUL_SPEED
+		if _down(KEY_X, KEY_SHIFT):
+			spd *= 0.5
+		var dir := Vector2(
+			float(_down(KEY_RIGHT, KEY_D)) - float(_down(KEY_LEFT, KEY_A)),
+			float(_down(KEY_DOWN, KEY_S)) - float(_down(KEY_UP, KEY_W)))
+		if dir.length() > 0.0:
+			dir = dir.normalized()
+		var step: Vector2 = dir * spd * delta
+		if _g_free(wsoul + Vector2(step.x, 0)):
+			wsoul.x += step.x
+		if _g_free(wsoul + Vector2(0, step.y)):
+			wsoul.y += step.y
+		_g_sync()
+		# fireballs
+		for i in G_EMIT.size():
+			var e: Dictionary = G_EMIT[i]
+			if g_t >= float(g_next[i]):
+				g_next[i] = float(g_next[i]) + float(e["period"])
+				g_balls.append({"pos": Vector2(float(e["x"]), float(e["y"])), "vel": Vector2(float(e["vx"]), float(e["vy"])) * G_BALL_SPEED})
+				if absf(float(e["x"]) - wsoul.x) < 260.0:
+					b.sfx("fire", 0.25)
+		var keep: Array = []
+		for ball: Dictionary in g_balls:
+			ball["pos"] += ball["vel"] * delta
+			var hit: bool = false
+			if (ball["pos"] as Vector2).distance_to(wsoul) < 10.0:
+				hit = b.hurt(D_GFIRE)
+			if not hit and _g_open(ball["pos"]):
+				keep.append(ball)
+		g_balls = keep
+		# blades
+		var soul_rect := Rect2(wsoul - Vector2(5, 5), Vector2(10, 10))
+		for r: Rect2 in _g_blades(g_t):
+			if r.size.y > 0.0 and r.intersects(soul_rect):
+				b.hurt(D_GBLADE)
+		# the wall of blades creeping up from behind
+		if wsoul.x - 5.0 < _g_wall_x(g_t):
+			b.hurt(D_GWALL)
+		b.rumble(0.12)
+		if wsoul.x >= G_EXIT:
+			gauntlet_done = true
+			g_end_t = 0.9
+			b.sfx("cut_big", 0.7)
+	else:
+		g_end_t -= delta
+		if g_end_t <= 0.0:
+			morph = 0.0
+			phase = "chain"
+			b.soul = CENTER
+			finished = true
+	return finished
+
+
+func _g_clip(r: Rect2) -> Rect2:
+	return Rect2(_g_screen(r.position), r.size).intersection(G_VIEW)
+
+
+func _g_draw_world() -> void:
+	b.draw_rect(G_VIEW, Color(0.10, 0.10, 0.15))
+	for r: Rect2 in G_OPEN:   # white outline first (a grown copy), then black on top: borders only on the union
+		var o: Rect2 = Rect2(_g_screen(r.position), r.size).grow(3.0).intersection(G_VIEW)
+		if o.has_area():
+			b.draw_rect(o, Color.WHITE)
+	for r: Rect2 in G_OPEN:
+		var c: Rect2 = _g_clip(r)
+		if c.has_area():
+			b.draw_rect(c, Color.BLACK)
+	# the exit glows at the far end
+	var ex: Rect2 = _g_clip(Rect2(G_EXIT, 220, 40, 90))
+	if ex.has_area():
+		b.draw_rect(ex, Color(1.0, 1.0, 0.8, 0.15 + 0.1 * sin(clock * 5.0)))
+	b.draw_rect(G_VIEW, Color.WHITE, false, 4.0)
+
+
+func _g_in_view(wx: float, pad: float) -> bool:
+	var sx: float = G_VIEW.position.x + wx - g_cam
+	return sx > G_VIEW.position.x + pad and sx < G_VIEW.end.x - pad
+
+
+func _g_draw_hazards() -> void:
+	# blades
+	for r: Rect2 in _g_blades(g_t):
+		if r.size.y <= 0.0:
+			continue
+		var c: Rect2 = _g_clip(r)
+		if c.has_area():
+			b.draw_rect(c, Color(0.08, 0.0, 0.14))
+			b.draw_line(c.position, Vector2(c.position.x, c.end.y), Color(0.6, 0.92, 1.0), 2.0)
+			b.draw_line(Vector2(c.end.x, c.position.y), c.end, Color(0.6, 0.92, 1.0), 2.0)
+			b.draw_line(Vector2(c.get_center().x, c.position.y), Vector2(c.get_center().x, c.end.y), Color(1, 1, 1, 0.8), 1.0)
+	# fireball vents + fireballs
+	for i in G_EMIT.size():
+		var e: Dictionary = G_EMIT[i]
+		if not _g_in_view(float(e["x"]), 6.0):
+			continue
+		var until: float = float(g_next[i]) - g_t
+		var glow: float = clampf(1.0 - until / 0.6, 0.0, 1.0)
+		var vp: Vector2 = _g_screen(Vector2(float(e["x"]), float(e["y"])))
+		b.draw_circle(vp, 5.0 + 3.0 * glow, Color(1.0, 0.4 + 0.4 * glow, 0.1, 0.35 + 0.55 * glow))
+	for ball: Dictionary in g_balls:
+		var wp: Vector2 = ball["pos"]
+		if _g_in_view(wp.x, 6.0):
+			var sp: Vector2 = _g_screen(wp)
+			b.draw_line(sp, sp - (ball["vel"] as Vector2).normalized() * 14.0, Color(1.0, 0.45, 0.1, 0.5), 8.0)
+			b.draw_circle(sp, 7.0, Color(1.0, 0.4, 0.1))
+			b.draw_circle(sp, 4.0, Color(1.0, 0.95, 0.5))
+	# the creeping wall of blades
+	var wx: float = _g_wall_x(g_t)
+	var wsx: float = G_VIEW.position.x + wx - g_cam
+	if wsx > G_VIEW.position.x:
+		var body := Rect2(G_VIEW.position.x, G_VIEW.position.y, minf(wsx, G_VIEW.end.x) - G_VIEW.position.x, G_VIEW.size.y)
+		b.draw_rect(body, Color(0.14, 0.0, 0.2, 0.9))
+		if wsx < G_VIEW.end.x:
+			var y: float = G_VIEW.position.y
+			while y < G_VIEW.end.y:
+				var jag: float = 6.0 * sin(clock * 9.0 + y * 0.35)
+				b.draw_colored_polygon(PackedVector2Array([Vector2(wsx - 2, y), Vector2(wsx + 12.0 + jag, y + 6.0), Vector2(wsx - 2, y + 12.0)]), Color(0.75, 0.95, 1.0, 0.95))
+				y += 12.0
+			b.draw_line(Vector2(wsx - 2, G_VIEW.position.y), Vector2(wsx - 2, G_VIEW.end.y), Color(1, 1, 1, 0.9), 2.0)
+		b.draw_rect(G_VIEW, Color.WHITE, false, 4.0)
+
+
 # ------------------------------------------------------------------ drawing: attacks
 func draw_attacks() -> void:
+	if phase == "gauntlet":
+		_g_draw_hazards()
+		return
 	for pt: Dictionary in parts:
 		_draw_part(pt)
 	for c: Dictionary in cracks:
 		_draw_crack(c)
+	for c: Dictionary in crumbles:
+		_draw_crumble(c)
+	for bl: Dictionary in blasts:
+		_draw_blast(bl)
 	for e: Dictionary in edges:
 		_draw_edge(e)
 	for s: Dictionary in slashes:
@@ -625,6 +1163,10 @@ func _edge_color(kind: String) -> Color:
 	match kind:
 		"sever":
 			return Color(0.9, 0.5, 1.0)
+		"dull":
+			return Color(1.0, 0.75, 0.3)
+		"mana":
+			return Color(0.45, 0.6, 1.0)
 		"final":
 			return Color(1.0, 0.95, 0.85)
 		_:
@@ -676,6 +1218,8 @@ func _draw_crack(c: Dictionary) -> void:
 func _draw_edge(e: Dictionary) -> void:
 	var ar: Rect2 = arena_rect()
 	var t: float = e["t"]
+	if t < -0.5:
+		return   # later blades in a run only show up half a second early
 	var tele: float = e["tele"]
 	var gx: float = e["gx"]
 	var half_gap: float = float(e["gw"]) * 0.5
@@ -746,7 +1290,7 @@ func _frame_name() -> String:
 	# HOLDING BACK (fight / spared): sheathed. At rest he is just Keras.png; when he attacks he only
 	# goes to "sword slightly out" - he casts the cuts through the air without drawing the blade.
 	if mode != "allout":
-		if mode == "fight" and pose_t > 0.0 and (pose == "raise" or pose == "slash"):
+		if (mode == "fight" or mode == "gauntlet") and pose_t > 0.0 and (pose == "raise" or pose == "slash"):
 			return "out"
 		return "idle"
 	# ALL-OUT: he draws the Dominion Breaker all the way.
