@@ -57,6 +57,25 @@ function Invoke-Git {
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Fail "git was not found on PATH. Install Git for Windows, or use GitHub Desktop." }
 
+# Sign-in: if the GitHub CLI is installed and logged in (gh auth login), let git use that login for this run.
+# It is done with environment variables, so your global git config is never changed.
+$GhExe = $null
+$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
+if ($ghCmd) { $GhExe = $ghCmd.Source }
+elseif (Test-Path "C:\Program Files\GitHub CLI\gh.exe") { $GhExe = "C:\Program Files\GitHub CLI\gh.exe" }
+if ($GhExe) {
+    & $GhExe auth status *> $null
+    if ($LASTEXITCODE -eq 0) {
+        $env:GIT_TERMINAL_PROMPT = "0"
+        $env:GIT_CONFIG_COUNT = "2"
+        $env:GIT_CONFIG_KEY_0 = "credential.helper"
+        $env:GIT_CONFIG_VALUE_0 = ""    # forget any other helpers first
+        $env:GIT_CONFIG_KEY_1 = "credential.helper"
+        $env:GIT_CONFIG_VALUE_1 = '!"' + ($GhExe -replace "\\", "/") + '" auth git-credential'
+        Info "Using the GitHub CLI login for git."
+    }
+}
+
 # build\ lives inside the project, so tell Godot not to scan/import anything in it (its PNGs would become game assets)
 New-Item -ItemType Directory -Force -Path (Join-Path $Repo "build") | Out-Null
 $gdignore = Join-Path $Repo "build\.gdignore"

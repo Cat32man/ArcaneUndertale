@@ -276,6 +276,10 @@ func setup_enemy(id: String) -> void:
 	stock = {"draught": 4, "elixir": 1}
 	enemy_hp = enemy_max
 	state = S.MENU
+	if id == "slime":
+		music_stop(0.0)
+	else:
+		music_start()
 
 
 func is_boss() -> bool:
@@ -292,11 +296,54 @@ const SFX_VOLUME := 0.45   # master level for all effects
 var sfx_players: Array = []
 var sfx_cache: Dictionary = {}
 var muted: bool = false
+
+# ---- music: assets/music/Boss.wav plays (looping) during the three boss fights, not the Slime.
+# It fades out when the fight ends. M mutes it together with the sound effects.
+const MUSIC_PATH := "res://assets/music/Boss.wav"
+const MUSIC_VOLUME := 0.5
+var music_player: AudioStreamPlayer
+var music_on: bool = false
+var music_tween: Tween
 var slash_sfx_done: bool = false
 var text_blip_at: int = 0
 
 
+func music_start() -> void:
+	if music_player == null or music_player.stream == null:
+		return
+	if music_tween:
+		music_tween.kill()
+	music_on = true
+	music_player.volume_db = linear_to_db(MUSIC_VOLUME)
+	music_player.stream_paused = muted
+	if not music_player.playing:
+		music_player.play()
+
+
+func music_stop(fade: float = 1.2) -> void:
+	music_on = false
+	if music_player == null or not music_player.playing:
+		return
+	if music_tween:
+		music_tween.kill()
+	if fade <= 0.0:
+		music_player.stop()
+		return
+	music_tween = create_tween()
+	music_tween.tween_property(music_player, "volume_db", -40.0, fade)
+	music_tween.tween_callback(func() -> void:
+		if not music_on:
+			music_player.stop())
+
+
 func _init_sfx() -> void:
+	music_player = AudioStreamPlayer.new()
+	add_child(music_player)
+	if ResourceLoader.exists(MUSIC_PATH):
+		music_player.stream = load(MUSIC_PATH)
+	music_player.finished.connect(func() -> void:   # backup in case the import is not set to loop
+		if music_on:
+			music_player.play())
 	for i in 10:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
@@ -409,6 +456,8 @@ func _input(ev: InputEvent) -> void:
 	var dy: int = int(k == KEY_DOWN or k == KEY_S) - int(k == KEY_UP or k == KEY_W)
 	if k == KEY_M:
 		muted = not muted
+		if music_player:
+			music_player.stream_paused = muted
 		return
 	if state == S.MENU or state == S.SUB or state == S.SELECT:
 		if (state == S.MENU and dx != 0) or (state != S.MENU and dy != 0):
@@ -605,6 +654,7 @@ func to_menu() -> void:
 
 func end_game(lines: Array, title: String) -> void:
 	end_text = title
+	music_stop(1.2)
 	match title:
 		"VICTORY":
 			sfx("win")
